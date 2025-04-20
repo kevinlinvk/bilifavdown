@@ -1,0 +1,15 @@
+{
+    "cookies": "",
+    "save_path": "./downloads",
+    "auto_download": true,
+    "interval_hours": 6,
+    "ffmpeg_path": "ffmpeg",
+    "request_interval": 2,
+    "max_retries": 3,
+    "max_title_length": 100,
+    "max_filename_length": 255,
+    "upname_max_length": 15,
+    "folder_history": true,
+    "retry_412_max": 3,
+    "retry_412_delay": 120
+  }
