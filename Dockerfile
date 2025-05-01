@@ -1,23 +1,25 @@
 # 使用带有Python和FFmpeg的基础镜像
 FROM python:3.9-slim-bullseye
 
+# 安装系统依赖
+RUN apt-get update && apt-get install -y \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
 # 设置工作目录
 WORKDIR /app
 
-# 安装系统依赖和Python依赖
-RUN apt-get update && apt-get install -y \
-    ffmpeg \
-    && rm -rf /var/lib/apt/lists/* \
-    && pip install --no-cache-dir \
+# 复制代码文件
+COPY bili_downloader.py scheduler.py ./
+
+# 安装Python依赖
+RUN pip install --no-cache-dir \
     requests>=2.31.0 \
     tqdm>=4.66.1 \
     urllib3>=2.1.0 \
     APScheduler==3.10.1
 
-# 复制应用代码
-COPY bili_downloader.py scheduler.py ./
-
-# 创建必要的目录并设置权限
+# 创建必要的目录结构
 RUN mkdir -p \
     /app/downloads \
     /app/config \
@@ -37,13 +39,8 @@ ENV PYTHONUNBUFFERED=1 \
     RETRY_412_MAX=3 \
     RETRY_412_DELAY=120
 
-# 设置卷
+# 设置卷映射
 VOLUME ["/app/downloads", "/app/config"]
-
-# 设置非root用户
-RUN useradd -m -u 1000 appuser && \
-    chown -R appuser:appuser /app
-USER appuser
 
 # 启动命令
 CMD ["sh", "-c", \
