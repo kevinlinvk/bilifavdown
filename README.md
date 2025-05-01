@@ -1,54 +1,171 @@
 # bilifavdown
 
-bilifavdown 是一个用于下载哔哩哔哩收藏夹内容的工具。
+bilifavdown 是一个用于下载哔哩哔哩收藏夹内容的工具。支持自动下载、多收藏夹管理、最高画质下载等功能。
 
-## 功能
+## 功能特点
 
-- 下载哔哩哔哩收藏夹中的视频。
-- 支持批量下载。
-- 自定义下载路径。
+- 支持下载哔哩哔哩收藏夹中的视频
+- 自动选择最高画质版本
+- 支持HDR视频下载
+- 支持多收藏夹管理
+- 自动跳过已下载内容
+- 支持Docker部署
+- 支持定时自动下载
 
-## 安装
+## 系统要求
 
-1. 克隆此仓库：
-    ```bash
-    git clone https://github.com/kevin/bilifavdown.git
-    ```
+- Python 3.9+
+- FFmpeg
+- 足够的磁盘空间
+
+## 安装方法
+
+### 1. 直接安装
+
+1. 克隆仓库：
+```bash
+git clone https://github.com/yourusername/bilifavdown.git
+cd bilifavdown
+```
+
 2. 安装依赖：
-    ```bash
-    cd bilifavdown
-    pip install -r requirements.txt
-    ```
+```bash
+pip install -r requirements.txt
+```
+
+3. 安装FFmpeg：
+- Windows: 下载 [FFmpeg](https://www.gyan.dev/ffmpeg/builds/) 并添加到系统PATH
+- Linux: `sudo apt install ffmpeg` 或 `sudo yum install ffmpeg`
+- macOS: `brew install ffmpeg`
+
+### 2. Docker安装
+
+1. 构建Docker镜像：
+```bash
+docker build -t bilifavdown .
+```
+
+2. 运行容器：
+```bash
+docker run -d \
+  --name bilifavdown \
+  -v $(pwd)/config:/app/config \
+  -v $(pwd)/downloads:/app/downloads \
+  -e AUTO_DOWNLOAD=true \
+  -e INTERVAL_HOURS=6 \
+  bilifavdown
+```
+
+## 配置说明
+
+在 `config/config.json` 中配置：
+
+```json
+{
+    "cookies": "你的B站cookies",
+    "save_path": "./downloads",
+    "auto_download": true,
+    "interval_hours": 6,
+    "ffmpeg_path": "ffmpeg",
+    "request_interval": 3,
+    "max_retries": 3,
+    "max_title_length": 100,
+    "max_filename_length": 255,
+    "upname_max_length": 15,
+    "folder_history": true,
+    "retry_412_max": 3,
+    "retry_412_delay": 120,
+    "download_hdr": true,
+    "target_folders": []
+}
+```
+
+### 配置项说明
+
+- `cookies`: B站登录cookies（必填）
+- `save_path`: 下载保存路径
+- `auto_download`: 是否启用自动下载
+- `interval_hours`: 自动下载间隔（小时）
+- `request_interval`: 请求间隔（秒）
+- `download_hdr`: 是否下载HDR版本
+- `target_folders`: 指定要下载的收藏夹ID列表
 
 ## 使用方法
 
-1. 配置哔哩哔哩账号 Cookies：  
-    在项目目录下的 `config` 文件夹中找到 `config.json` 文件，并添加以下内容：  
-    ```json
-    {
-        "cookies": "你的Cookies"
-    }
-    ```
+### 1. 直接运行
 
-2. 使用 Docker 构建并运行：  
-    如果需要使用 Docker，可以按照以下步骤操作：  
-    - 构建 Docker 镜像：  
-        ```bash
-        docker build -t bilifavdown .
-        ```
-    - 运行容器并挂载配置文件和下载目录：  
-        ```bash
-        docker run -v $(pwd)/config:/app/config -v $(pwd)/downloads:/app/downloads bilifavdown
-            ```  
-              默认情况下，Docker 容器会每 6 小时自动运行一次下载任务。
+```bash
+python bili_downloader.py
+```
 
-              请确保 `config` 文件夹中的 `config.json` 文件已正确配置，例如：  
-              ```json
-              {
-                "cookies": "",
-                "save_path": "./downloads",
-                "auto_download": true,
-              }
-              ```
-这三个是最关键的配置，cookies是用于验证下载，save_path用于配置下载目录，auto_downlanded用于配置是否启用最高画质自动下载,具体其他配置可以参考config文件夹下的文件,如果使用docker部署的话则下载目录默认使用dockerloads就可以了
-注意如果您发现有段时间不能下载了那就请更新cookies文件
+### 2. Docker运行
+
+```bash
+# 自动下载模式
+docker run -d \
+  --name bilifavdown \
+  -v $(pwd)/config:/app/config \
+  -v $(pwd)/downloads:/app/downloads \
+  -e AUTO_DOWNLOAD=true \
+  -e INTERVAL_HOURS=6 \
+  bilifavdown
+
+# 手动下载模式
+docker run -d \
+  --name bilifavdown \
+  -v $(pwd)/config:/app/config \
+  -v $(pwd)/downloads:/app/downloads \
+  -e AUTO_DOWNLOAD=false \
+  bilifavdown
+```
+
+## 目录结构
+
+```
+bilifavdown/
+├── bili_downloader.py    # 主程序
+├── scheduler.py          # 定时任务
+├── requirements.txt      # Python依赖
+├── Dockerfile           # Docker配置
+├── config/              # 配置目录
+│   └── config.json      # 配置文件
+└── downloads/           # 下载目录
+```
+
+## 注意事项
+
+1. 请确保配置文件中的cookies有效
+2. 下载目录需要有足够的磁盘空间
+3. 建议适当设置请求间隔，避免被限制
+4. 如果使用Docker，确保挂载目录有正确的权限
+
+## 常见问题
+
+1. 无法获取视频信息
+   - 检查cookies是否有效
+   - 检查网络连接
+   - 适当增加请求间隔
+
+2. 下载失败
+   - 检查磁盘空间
+   - 检查网络连接
+   - 查看日志信息
+
+3. 视频无法播放
+   - 确保FFmpeg正确安装
+   - 检查视频文件完整性
+
+## 更新日志
+
+### v1.0.0
+- 初始版本发布
+- 支持基本下载功能
+- 支持Docker部署
+
+## 许可证
+
+MIT License
+
+## 贡献
+
+欢迎提交Issue和Pull Request
