@@ -304,6 +304,13 @@ class BilibiliDownloader:
                 with self.session.get(url, stream=True, timeout=60) as r:
                     r.raise_for_status()
                     total_size = int(r.headers.get("content-length", 0))
+                    
+                    # 检查响应内容是否为空
+                    if total_size == 0:
+                        self.logger.warning(f"响应内容为空，重试中... ({retry+1}/{self.config.max_retries})")
+                        time.sleep(2)
+                        continue
+                        
                     with open(path, "wb") as f, tqdm(
                         desc=f"下载 {path.name}",
                         total=total_size,
@@ -315,9 +322,22 @@ class BilibiliDownloader:
                             if chunk:
                                 f.write(chunk)
                                 bar.update(len(chunk))
-                return True
-            except Exception as e:
+                                
+                    # 验证下载的文件大小
+                    if path.stat().st_size == 0:
+                        self.logger.warning(f"下载的文件大小为0，重试中... ({retry+1}/{self.config.max_retries})")
+                        path.unlink()
+                        time.sleep(2)
+                        continue
+                        
+                    return True
+            except requests.exceptions.RequestException as e:
                 self.logger.warning(f"下载失败（重试 {retry+1}/{self.config.max_retries}）: {str(e)}")
+                if path.exists():
+                    path.unlink()
+                time.sleep(2)
+            except Exception as e:
+                self.logger.error(f"下载过程发生未知错误: {str(e)}")
                 if path.exists():
                     path.unlink()
                 time.sleep(2)
@@ -325,26 +345,46 @@ class BilibiliDownloader:
 
     def _merge_files(self, video_path: Path, audio_path: Path, output_path: Path) -> bool:
         try:
-            subprocess.run(
-                [
-                    self.config.ffmpeg_path,
-                    "-y",
-                    "-loglevel", "error",
-                    "-i", str(video_path),
-                    "-i", str(audio_path),
-                    "-c", "copy",
-                    str(output_path)
-                ],
-                check=True,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
+            # 检查输入文件是否存在且大小不为0
+            if not video_path.exists() or not audio_path.exists():
+                self.logger.error("视频或音频文件不存在")
+                return False
+                
+            if video_path.stat().st_size == 0 or audio_path.stat().st_size == 0:
+                self.logger.error("视频或音频文件大小为0")
+                return False
+
+            # 使用更详细的FFmpeg命令
+            cmd = [
+                self.config.ffmpeg_path,
+                "-y",
+                "-loglevel", "error",
+                "-i", str(video_path),
+                "-i", str(audio_path),
+                "-c:v", "copy",
+                "-c:a", "copy",
+                "-strict", "experimental",
+                str(output_path)
+            ]
+            
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                check=True
             )
+            
+            # 验证输出文件
+            if not output_path.exists() or output_path.stat().st_size == 0:
+                self.logger.error("合并后的文件无效")
+                return False
+                
             return True
         except subprocess.CalledProcessError as e:
-            self.logger.error(f"合并失败: {e.stderr.decode()}")
+            self.logger.error(f"FFmpeg合并失败: {e.stderr}")
             return False
         except Exception as e:
-            self.logger.error(f"FFmpeg异常: {str(e)}")
+            self.logger.error(f"合并过程发生未知错误: {str(e)}")
             return False
 
 
@@ -356,6 +396,7 @@ class BilibiliDownloader:
 
             video_info = self.get_video_info(bvid)
             if not video_info:
+                self.logger.error(f"无法获取视频信息: {bvid}")
                 return False
 
             page_info = next((p for p in video_info["pages"] if p["cid"] == cid), None)
@@ -382,28 +423,52 @@ class BilibiliDownloader:
                 output_path = dest_dir / output_name
                 counter += 1
 
+            # 获取媒体URL
             video_url, audio_url = self._get_media_urls(bvid, cid, quality)
             if not video_url or not audio_url:
+                self.logger.error(f"无法获取媒体URL: {bvid}-{cid}")
                 return False
 
+            # 创建临时文件
             temp_video = self.config.temp_dir / f"{bvid}_{cid}_video.m4s"
             temp_audio = self.config.temp_dir / f"{bvid}_{cid}_audio.m4s"
 
-            success = (
-                self._download_media(video_url, temp_video) and
-                self._download_media(audio_url, temp_audio) and
-                self._merge_files(temp_video, temp_audio, output_path)
-            )
+            # 下载视频和音频
+            video_success = self._download_media(video_url, temp_video)
+            if not video_success:
+                self.logger.error(f"视频下载失败: {bvid}-{cid}")
+                return False
 
-            if success:
-                self._save_download_entry(bvid, cid, quality, base_filename, up_name, folder_id)
-                self.downloaded.add((bvid, cid, folder_id))
+            audio_success = self._download_media(audio_url, temp_audio)
+            if not audio_success:
+                self.logger.error(f"音频下载失败: {bvid}-{cid}")
+                temp_video.unlink(missing_ok=True)
+                return False
 
+            # 合并文件
+            merge_success = self._merge_files(temp_video, temp_audio, output_path)
+            if not merge_success:
+                self.logger.error(f"文件合并失败: {bvid}-{cid}")
+                temp_video.unlink(missing_ok=True)
+                temp_audio.unlink(missing_ok=True)
+                return False
+
+            # 清理临时文件
             temp_video.unlink(missing_ok=True)
             temp_audio.unlink(missing_ok=True)
-            return success
+
+            # 保存下载记录
+            self._save_download_entry(bvid, cid, quality, base_filename, up_name, folder_id)
+            self.downloaded.add((bvid, cid, folder_id))
+            
+            self.logger.info(f"下载成功: {output_name}")
+            return True
+
         except Exception as e:
             self.logger.error(f"下载流程异常: {str(e)}")
+            # 清理临时文件
+            temp_video.unlink(missing_ok=True)
+            temp_audio.unlink(missing_ok=True)
             return False
 
     def _get_media_urls(self, bvid: str, cid: int, quality: int) -> Tuple[Optional[str], Optional[str]]:
