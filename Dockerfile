@@ -17,12 +17,14 @@ RUN apt-get update && apt-get install -y \
 # 复制应用代码
 COPY bili_downloader.py scheduler.py ./
 
-# 创建必要的目录
+# 创建必要的目录并设置权限
 RUN mkdir -p \
     /app/downloads \
     /app/config \
     /app/temp \
-    && chmod -R 755 /app
+    && chmod -R 777 /app/downloads \
+    && chmod -R 777 /app/config \
+    && chmod -R 777 /app/temp
 
 # 设置环境变量
 ENV PYTHONUNBUFFERED=1 \
