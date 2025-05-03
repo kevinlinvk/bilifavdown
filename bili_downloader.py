@@ -548,7 +548,11 @@ class BilibiliDownloader:
             " ", 
             raw_title
         ).strip()
-        base_title = re.sub(r'\s+', ' ', base_title)[:self.config.max_title_length]
+        
+        # 限制标题长度，考虑路径长度限制
+        # 假设路径前缀长度为50（包括目录名和扩展名）
+        max_title_length = min(self.config.max_title_length, 150)
+        base_title = re.sub(r'\s+', ' ', base_title)[:max_title_length]
 
         # 处理分P信息
         page_num = page_info.get("page", 1)
@@ -561,7 +565,8 @@ class BilibiliDownloader:
             if page_part.lower() in raw_title.lower():  # 分P名已包含在标题中
                 page_suffix = f"_P{page_num}"
             else:
-                page_suffix = f"_{page_part[:20]}"  # 保留有区分度的部分
+                # 限制分P名称长度
+                page_suffix = f"_{page_part[:15]}"  # 保留有区分度的部分
 
         # 处理UP主名称
         up_display = ""
@@ -572,7 +577,10 @@ class BilibiliDownloader:
         # 组合各部分
         filename = f"{base_title}{page_suffix}{up_display}{suffix}"
         filename = re.sub(r'_{2,}', '_', filename)  # 清理连续下划线
-        return filename[:self.config.max_filename_length]
+        
+        # 确保最终文件名不超过系统限制
+        max_length = min(self.config.max_filename_length, 240)  # 考虑路径长度限制
+        return filename[:max_length]
     
     
 
