@@ -127,7 +127,7 @@ docker run -d \
   -v $(pwd)/downloads:/app/downloads \
   -e AUTO_DOWNLOAD=true \
   -e INTERVAL_HOURS=6 \
-  bilifavdown
+  kevinlinvk/bilifavdown
 
 # 手动下载模式
 docker run -d \
@@ -135,7 +135,7 @@ docker run -d \
   -v $(pwd)/config:/app/config \
   -v $(pwd)/downloads:/app/downloads \
   -e AUTO_DOWNLOAD=false \
-  bilifavdown
+  kevinlinvk/bilifavdown
 ```
 
 ## 目录结构
