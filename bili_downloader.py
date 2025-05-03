@@ -429,9 +429,10 @@ class BilibiliDownloader:
                 self.logger.error(f"无法获取媒体URL: {bvid}-{cid}")
                 return False
 
-            # 创建临时文件
-            temp_video = self.config.temp_dir / f"{bvid}_{cid}_video.m4s"
-            temp_audio = self.config.temp_dir / f"{bvid}_{cid}_audio.m4s"
+            # 创建临时文件，使用简短的命名方式
+            temp_prefix = f"{bvid}_{cid}"
+            temp_video = self.config.temp_dir / f"{temp_prefix}_v.m4s"
+            temp_audio = self.config.temp_dir / f"{temp_prefix}_a.m4s"
 
             # 下载视频和音频
             video_success = self._download_media(video_url, temp_video)
@@ -467,8 +468,10 @@ class BilibiliDownloader:
         except Exception as e:
             self.logger.error(f"下载流程异常: {str(e)}")
             # 清理临时文件
-            temp_video.unlink(missing_ok=True)
-            temp_audio.unlink(missing_ok=True)
+            if 'temp_video' in locals():
+                temp_video.unlink(missing_ok=True)
+            if 'temp_audio' in locals():
+                temp_audio.unlink(missing_ok=True)
             return False
 
     def _get_media_urls(self, bvid: str, cid: int, quality: int) -> Tuple[Optional[str], Optional[str]]:
